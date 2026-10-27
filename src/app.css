@@ -1,0 +1,94 @@
+@import "tailwindcss";
+
+/*
+ * 设计 Token（任务书 §11.3）
+ * 明暗双主题靠 [data-theme] 切换变量实现，Tailwind 侧只认 @theme inline 里的名字。
+ * 层次一律用 1px 描边 + 背景色差，禁止 box-shadow。
+ */
+@theme inline {
+  --color-canvas: var(--du-canvas);
+  --color-surface: var(--du-surface);
+  --color-ink: var(--du-ink);
+  --color-ink-sub: var(--du-ink-sub);
+  --color-ink-weak: var(--du-ink-weak);
+  --color-line: var(--du-line);
+  --color-accent: var(--du-accent);
+  --color-track: var(--du-track);
+
+  --font-sans: "PingFang SC", "Microsoft YaHei UI", "Segoe UI Variable", system-ui, sans-serif;
+
+  --text-title: 20px;
+  --text-title--line-height: 1.35;
+  --text-md: 15px;
+  --text-md--line-height: 1.4;
+  --text-sm: 14.5px;
+  --text-sm--line-height: 1.45;
+  --text-body: 13.5px;
+  --text-body--line-height: 1.55;
+  --text-xs: 12px;
+  --text-xs--line-height: 1.5;
+
+  --radius-cover: 10px;
+  --radius-card: 14px;
+  --radius-pill: 999px;
+}
+
+:root {
+  --du-canvas: #fafafa;
+  --du-surface: #ffffff;
+  --du-ink: #16161a;
+  --du-ink-sub: #8a8a8e;
+  --du-ink-weak: #b4b4b8;
+  --du-line: rgba(0, 0, 0, 0.06);
+  --du-accent: #ff5c33;
+  --du-track: rgba(0, 0, 0, 0.08);
+
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  --du-canvas: #0f0f11;
+  --du-surface: #17171a;
+  --du-ink: #f2f2f3;
+  --du-ink-sub: #8a8a8e;
+  --du-ink-weak: #5c5c61;
+  --du-line: rgba(255, 255, 255, 0.08);
+  --du-accent: #ff5c33;
+  --du-track: rgba(255, 255, 255, 0.12);
+
+  color-scheme: dark;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--du-canvas);
+  color: var(--du-ink);
+  font-family: var(--font-sans);
+  font-size: var(--text-body);
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+
+#app {
+  height: 100%;
+}
+
+/* 滚动条：极细，跟随前景色 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--du-track);
+  border-radius: var(--radius-pill);
+}
