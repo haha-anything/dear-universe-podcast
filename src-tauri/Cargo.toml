@@ -1,0 +1,46 @@
+# Rust 侧依赖。
+#
+# 只装当前接通的功能真正用到的东西。M0 阶段范围是：
+# 拉 RSS / 解析 / 传给前端 / 托盘后台播放。
+# 数据库、下载、更新等在各自的里程碑再补（AGENTS.md：不写没接通的死代码）。
+
+[package]
+name = "dear-universe-podcast"
+version = "0.1.0"
+description = "大宇宙播客 —— 轻量开源桌面播客客户端"
+edition = "2021"
+rust-version = "1.80"
+
+[lib]
+# `_lib` 后缀看着多余，但 Windows 上不加会和 bin 名冲突，见 cargo#8519
+name = "dear_universe_podcast_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+# tray-icon：M0 就要验证「最小化到托盘后音频不能断」
+tauri = { version = "2", features = ["tray-icon"] }
+
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# rustls 而不是 openssl：Windows 上 openssl 是噩梦（任务书 §4）
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "gzip"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time"] }
+feed-rs = "2"
+url = "2"
+
+thiserror = "2"
+anyhow = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# 打包瘦身见 https://tauri.app/concept/size/#cargo-configuration
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
