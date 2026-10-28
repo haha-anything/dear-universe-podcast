@@ -37,6 +37,27 @@ pub fn feed_unsubscribe(origin: String, db: State<'_, core::db::Database>) -> Re
     Ok(())
 }
 
+/// 改节目的「用户侧设置」：改名 / 跳过片头 / 跳过片尾（§8.8）
+#[tauri::command]
+pub fn podcast_update_settings(
+    origin: String,
+    custom_title: String,
+    skip_intro_sec: i32,
+    skip_outro_sec: i32,
+    db: State<'_, core::db::Database>,
+) -> Result<(), String> {
+    let conn = db.read().map_err(|e| e.to_string())?;
+    core::db::podcast::update_settings(
+        &conn,
+        &origin,
+        custom_title.trim(),
+        skip_intro_sec.clamp(0, 3600),
+        skip_outro_sec.clamp(0, 3600),
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 /// 校验 RSS 地址：必须是 http/https 的完整 URL
 fn validate_url(raw: &str) -> Result<String, String> {
     let trimmed = raw.trim();

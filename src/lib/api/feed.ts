@@ -18,3 +18,18 @@ export function feedList(): Promise<Podcast[]> {
 export function feedUnsubscribe(origin: string): Promise<void> {
   return invoke<void>("feed_unsubscribe", { origin });
 }
+
+/** 改名 / 跳过片头 / 跳过片尾。改名只能改 customTitle，title 会被刷新覆盖。 */
+export function podcastUpdateSettings(
+  origin: string,
+  customTitle: string,
+  skipIntroSec: number,
+  skipOutroSec: number,
+): Promise<void> {
+  return invoke<void>("podcast_update_settings", {
+    origin,
+    customTitle,
+    skipIntroSec,
+    skipOutroSec,
+  });
+}

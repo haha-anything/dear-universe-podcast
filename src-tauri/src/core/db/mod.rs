@@ -19,10 +19,16 @@ use crate::error::AppError;
 
 /// 迁移脚本，按数组顺序执行，下标 + 1 就是 schema_version。
 /// 用 include_str! 编进二进制，安装包里不用额外带文件。
-const MIGRATIONS: &[(&str, &str)] = &[(
-    "001_init.sql",
-    include_str!("../../../migrations/001_init.sql"),
-)];
+const MIGRATIONS: &[(&str, &str)] = &[
+    (
+        "001_init.sql",
+        include_str!("../../../migrations/001_init.sql"),
+    ),
+    (
+        "002_queue_order.sql",
+        include_str!("../../../migrations/002_queue_order.sql"),
+    ),
+];
 
 /// 应用自己的库。整进程一份，通过 Tauri managed state 注入命令层。
 pub struct Database {

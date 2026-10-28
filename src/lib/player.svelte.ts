@@ -1,5 +1,7 @@
+import { episodeGet } from "./api/episode";
 import { progressGet, progressSave, sessionSave } from "./api/player";
-import type { Episode } from "./types";
+import { queueList, queueNext, queueRemoveEpisode } from "./api/queue";
+import type { Episode, QueueItem } from "./types";
 
 /** 倍速档位，0.5–3.0 之间，符合任务书 §10 */
 export const PLAYBACK_RATES = [0.75, 1, 1.25, 1.5, 1.75, 2, 3] as const;
@@ -28,9 +30,16 @@ class Player {
   rate = $state<number>(1);
   error = $state<string | null>(null);
 
+  /** 播放队列。手动添加，不自动塞整档节目（§17.7） */
+  queue: QueueItem[] = $state([]);
+  /** 是否播完自动接下一集 */
+  autoAdvance = $state(true);
+
   #el: HTMLAudioElement | null = null;
   #cleanups: Array<() => void> = [];
   #lastFlushAt = 0;
+  #skipOutroSec = 0;
+  #advancing = false;
 
   attach(el: HTMLAudioElement): () => void {
     this.#el = el;
@@ -46,6 +55,7 @@ class Player {
     on("timeupdate", () => {
       this.positionSec = el.currentTime;
       this.#maybeFlush();
+      this.#maybeAutoAdvance();
     });
     on("durationchange", () => {
       if (Number.isFinite(el.duration) && el.duration > 0) {
@@ -54,6 +64,7 @@ class Player {
     });
     on("play", () => {
       this.playing = true;
+      this.#syncMediaSession();
     });
     on("pause", () => {
       this.playing = false;
@@ -70,7 +81,7 @@ class Player {
       this.playing = false;
       this.positionSec = this.durationSec;
       // 落库：把位置顶到时长，Rust 侧据此把 finished 置上
-      void this.#flush();
+      void this.#flush().then(() => this.#advance());
     });
     on("error", () => {
       this.playing = false;
@@ -88,6 +99,51 @@ class Player {
     };
   }
 
+  // ── 队列 ────────────────────────────────────────────────────────
+
+  async refreshQueue(): Promise<void> {
+    this.queue = await queueList().catch(() => []);
+  }
+
+  /** 从队列里挑一集播（点队列项） */
+  async playQueueItem(item: QueueItem): Promise<void> {
+    if (!item.audioUrl) return;
+
+    // 裸 URL 项没有 episode 记录，拼一个临时 Episode 出来播
+    const episode: Episode =
+      item.episodeId !== null
+        ? (await episodeOf(item.episodeId)) ?? synthEpisode(item)
+        : synthEpisode(item);
+
+    await this.play(episode);
+  }
+
+  /** 播完一集：出队 + 接下一集 */
+  async #advance(): Promise<void> {
+    // 片尾跳过是靠 timeupdate 触发的，一秒来四次；没有这个闸门会连着出队好几集
+    if (this.#advancing) return;
+    this.#advancing = true;
+
+    try {
+      const finished = this.current;
+      if (!finished) return;
+
+      await queueRemoveEpisode(finished.id).catch(() => undefined);
+      await this.refreshQueue();
+
+      if (!this.autoAdvance) return;
+
+      const next = await queueNext(finished.id).catch(() => null);
+      if (!next) return;
+
+      await this.playQueueItem(next);
+    } finally {
+      this.#advancing = false;
+    }
+  }
+
+  // ── 播放控制 ────────────────────────────────────────────────────
+
   /**
    * 播放某一集；点的是当前集就只做暂停/恢复。
    * 切集会先把上一集的进度写掉，避免丢进度。
@@ -102,6 +158,13 @@ class Player {
       return;
     }
 
+    await this.play(episode);
+  }
+
+  async play(episode: Episode): Promise<void> {
+    const el = this.#el;
+    if (!el) return;
+
     await this.#flush();
 
     const startSec = await startPositionOf(episode);
@@ -111,10 +174,12 @@ class Player {
     this.error = null;
     this.buffering = true;
     this.#lastFlushAt = Date.now();
+    this.#skipOutroSec = episode.skipOutroSec ?? 0;
 
     el.src = episode.audioUrl;
     el.load();
     this.#armStartAt(startSec);
+    this.#syncMediaSession();
 
     void el.play().catch((e: unknown) => {
       this.playing = false;
@@ -131,9 +196,11 @@ class Player {
     this.current = episode;
     this.positionSec = positionSec;
     this.durationSec = episode.durationSec ?? 0;
+    this.#skipOutroSec = episode.skipOutroSec ?? 0;
     el.src = episode.audioUrl;
     el.load();
     this.#armStartAt(positionSec);
+    this.#syncMediaSession();
   }
 
   seek(sec: number): void {
@@ -152,6 +219,45 @@ class Player {
     this.rate = rate;
     if (this.#el) this.#el.playbackRate = rate;
     void this.#flush();
+  }
+
+  /** 片尾跳过：剩这么多秒时就算播完，直接接下一集（§8.8） */
+  #maybeAutoAdvance(): void {
+    const el = this.#el;
+    if (!el || this.#skipOutroSec <= 0 || !this.autoAdvance) return;
+    if (!Number.isFinite(el.duration) || el.duration <= 0) return;
+
+    if (el.duration - el.currentTime <= this.#skipOutroSec) {
+      // 直接掉 flush+advance，ended 事件不会来了
+      void this.#flush().then(() => this.#advance());
+    }
+  }
+
+  /**
+   * 媒体会话（§10）。Chromium 在有真实播放 + metadata 时会把它注册进 Windows SMTC，
+   * 硬件媒体键因此可能免费可用 —— M2 先接上，能不能用实测见 docs/M2-验收.md。
+   */
+  #syncMediaSession(): void {
+    if (!("mediaSession" in navigator)) return;
+
+    const ep = this.current;
+    if (!ep) return;
+
+    try {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: ep.title,
+        artist: ep.podcastTitle,
+        artwork: ep.imageUrl ? [{ src: ep.imageUrl, sizes: "512x512", type: "image/jpeg" }] : [],
+      });
+
+      navigator.mediaSession.setActionHandler("play", () => void this.#el?.play());
+      navigator.mediaSession.setActionHandler("pause", () => this.#el?.pause());
+      navigator.mediaSession.setActionHandler("seekbackward", () => this.skip(-15));
+      navigator.mediaSession.setActionHandler("seekforward", () => this.skip(30));
+      navigator.mediaSession.setActionHandler("nexttrack", () => void this.#advance());
+    } catch {
+      // 某些 WebView2 版本没有 MediaMetadata，忽略：媒体键是加分项不是主线
+    }
   }
 
   /** 元数据就绪才能设 currentTime，早设会被忽略 */
@@ -197,6 +303,8 @@ class Player {
  * 这一集该从哪开始播。
  * 列表查询已经 LEFT JOIN 过 play_state，通常不用再问一遍；
  * 只有在单集对象里没带出进度时才补一次 IPC。
+ *
+ * 跳过片头在这里生效：没听过的情况下直接跳到 skipIntroSec 之后。
  */
 async function startPositionOf(episode: Episode): Promise<number> {
   let sec = episode.positionSec ?? 0;
@@ -206,7 +314,8 @@ async function startPositionOf(episode: Episode): Promise<number> {
     sec = state?.positionSec ?? 0;
   }
 
-  if (sec <= 0) return 0;
+  // 没听过的，跳过片头
+  if (sec <= 0) return Math.max(episode.skipIntroSec ?? 0, 0);
 
   // 听完了就从头来（finished 是粘性位，能走到这里说明它是被覆盖过的）
   if (episode.finished) return 0;
@@ -214,6 +323,30 @@ async function startPositionOf(episode: Episode): Promise<number> {
   if (total > 0 && sec / total > FINISH_RATIO) return 0;
 
   return sec;
+}
+
+async function episodeOf(id: string): Promise<Episode | null> {
+  return episodeGet(id).catch(() => null);
+}
+
+/** 裸 URL 队列项没有 episode 记录，现场拼一个够播的对象 */
+function synthEpisode(item: QueueItem): Episode {
+  return {
+    id: `raw:${item.audioUrl ?? item.id}`,
+    guid: null,
+    origin: "",
+    title: item.title,
+    podcastTitle: item.podcastTitle ?? "队列",
+    audioUrl: item.audioUrl ?? "",
+    imageUrl: item.imageUrl,
+    durationSec: item.durationSec,
+    publishedMs: null,
+    description: null,
+    positionSec: null,
+    finished: false,
+    skipIntroSec: 0,
+    skipOutroSec: 0,
+  };
 }
 
 function describeMediaError(err: MediaError | null): string {

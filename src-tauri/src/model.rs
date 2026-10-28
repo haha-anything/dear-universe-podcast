@@ -29,6 +29,26 @@ pub struct EpisodeDto {
     pub position_sec: Option<i64>,
     /// 粘性位：听完过一次就永远是 true（§8.7）
     pub finished: bool,
+    /// 所属播客的「跳过片头」设置（秒）。播放器据此决定起点。
+    pub skip_intro_sec: i32,
+    /// 所属播客的「跳过片尾」设置（秒）。剩这么多秒时自动接下一集。
+    pub skip_outro_sec: i32,
+}
+
+/// 队列里的一项。
+///
+/// `episode_id` 为空说明这是条裸音频 URL（§8.5：用户确实会往队列里塞这种东西），
+/// 此时 `audio_url` / `title` 取自 `raw_url` 与队列自带的标题。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct QueueItemDto {
+    pub id: i64,
+    pub episode_id: Option<String>,
+    pub title: String,
+    pub audio_url: Option<String>,
+    pub image_url: Option<String>,
+    pub duration_sec: Option<i64>,
+    pub podcast_title: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

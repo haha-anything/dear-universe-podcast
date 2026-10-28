@@ -19,6 +19,21 @@ export interface Episode {
   positionSec: number | null;
   /** 粘性位：听完过一次就一直是 true */
   finished: boolean;
+  /** 所属播客的跳过片头设置（秒） */
+  skipIntroSec: number;
+  /** 所属播客的跳过片尾设置（秒） */
+  skipOutroSec: number;
+}
+
+/** 队列项。裸 URL 项没有 episodeId，靠 title/audioUrl 直接播 */
+export interface QueueItem {
+  id: number;
+  episodeId: string | null;
+  title: string;
+  audioUrl: string | null;
+  imageUrl: string | null;
+  durationSec: number | null;
+  podcastTitle: string | null;
 }
 
 export interface Podcast {

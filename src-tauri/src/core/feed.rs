@@ -1,7 +1,11 @@
 //! RSS 抓取与解析。
 //!
-//! M0 只做「预览」：给一个 feed 地址，返回节目信息 + 单集列表，不写库。
-//! M1 会把这里拆成「持久化 + ETag 条件请求」两条路径。
+//! 这一层的产出 [`FeedDto`] 既是「预览」的数据源，也是订阅入库的原料，
+//! 所以 id / guid / pub_date 这些字段必须按数据库的口径生成：
+//!   - `id` = `{feedUrl}:{audioUrl}`（§8.4 规定的主键格式）
+//!   - 时长保持秒，由 `core/db/episode.rs` 在入库时 ×1000
+//!
+//! M2 会把这里拆成「无条件预览」与「带 ETag 的条件刷新」两条路径。
 
 use feed_rs::model::{Entry, Feed};
 use reqwest::Client;
@@ -54,7 +58,7 @@ fn convert(feed_url: &str, feed: &Feed) -> FeedDto {
         .entries
         .iter()
         .take(MAX_EPISODES)
-        .filter_map(|entry| convert_entry(entry, &title, cover.as_deref()))
+        .filter_map(|entry| convert_entry(entry, feed_url, &title, cover.as_deref()))
         .collect();
 
     FeedDto {
@@ -67,7 +71,12 @@ fn convert(feed_url: &str, feed: &Feed) -> FeedDto {
     }
 }
 
-fn convert_entry(entry: &Entry, podcast_title: &str, fallback_cover: Option<&str>) -> Option<EpisodeDto> {
+fn convert_entry(
+    entry: &Entry,
+    feed_url: &str,
+    podcast_title: &str,
+    fallback_cover: Option<&str>,
+) -> Option<EpisodeDto> {
     let audio_url = pick_audio(entry)?;
 
     let description = text_of(entry.summary.as_ref()).or_else(|| {
@@ -78,14 +87,21 @@ fn convert_entry(entry: &Entry, podcast_title: &str, fallback_cover: Option<&str
     });
 
     Some(EpisodeDto {
-        id: format!("{}|{}", podcast_title, audio_url),
+        id: format!("{feed_url}:{audio_url}"),
+        guid: Some(entry.id.clone()),
+        origin: feed_url.to_string(),
         title: text_of(entry.title.as_ref()).unwrap_or_else(|| "(无标题)".to_string()),
         podcast_title: podcast_title.to_string(),
         audio_url: audio_url.clone(),
         image_url: pick_episode_image(entry).or_else(|| fallback_cover.map(str::to_string)),
         duration_sec: pick_duration(entry),
-        published_at: entry.published.map(|dt| dt.to_rfc3339()),
+        published_ms: entry.published.map(|dt| dt.timestamp_millis()),
         description,
+        position_sec: None,
+        finished: false,
+        // 跳过片头片尾是播客级设置，解析 feed 时无从得知，由读库时 JOIN 补上
+        skip_intro_sec: 0,
+        skip_outro_sec: 0,
     })
 }
 

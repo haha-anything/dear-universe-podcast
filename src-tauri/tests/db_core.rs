@@ -34,7 +34,8 @@ fn migration_runs_once_and_records_version() {
         conn.query_row("SELECT MAX(version) FROM schema_version", [], |r| r.get(0))
             .expect("查不到 schema_version")
     };
-    assert_eq!(version, 1, "初始迁移必须落在 schema_version = 1");
+    // 迁移脚本数量即最新版本号；加迁移时这里要跟着改
+    assert_eq!(version, 2, "迁移没跑到最新");
 
     // 再开一次：迁移是幂等的，不能把已有数据搞坏
     drop(db);
@@ -42,7 +43,7 @@ fn migration_runs_once_and_records_version() {
     assert_eq!(count(&reopened, "SELECT COUNT(*) FROM podcast"), 0);
     assert_eq!(
         count(&reopened, "SELECT COUNT(*) FROM schema_version"),
-        1,
+        2,
         "重复打开不该重复应用迁移"
     );
 }

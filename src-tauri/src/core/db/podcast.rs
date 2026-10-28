@@ -85,6 +85,28 @@ pub fn list(conn: &Connection) -> Result<Vec<PodcastDto>, rusqlite::Error> {
     rows.collect()
 }
 
+/// 改「用户侧」的三个字段：改名、跳过片头、跳过片尾。
+///
+/// 这三个是 §8.8 点名要真做出来的（参考实现有字段没 UI）。
+/// 注意别碰 title：那是 feed 里的原名，刷新会被覆盖，改名只能落 custom_title。
+pub fn update_settings(
+    conn: &Connection,
+    origin: &str,
+    custom_title: &str,
+    skip_intro_sec: i32,
+    skip_outro_sec: i32,
+) -> Result<bool, rusqlite::Error> {
+    let n = conn.execute(
+        "UPDATE podcast
+            SET custom_title   = ?2,
+                skip_intro_sec = ?3,
+                skip_outro_sec = ?4
+          WHERE origin = ?1",
+        params![origin, custom_title, skip_intro_sec, skip_outro_sec],
+    )?;
+    Ok(n > 0)
+}
+
 /// 退订。episode / play_state / queue_item 都挂在 origin 上，
 /// 开了 foreign_keys 之后会由 ON DELETE CASCADE 连带清掉。
 pub fn remove(conn: &Connection, origin: &str) -> Result<bool, rusqlite::Error> {

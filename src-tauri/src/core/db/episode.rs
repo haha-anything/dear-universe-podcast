@@ -11,7 +11,8 @@ use crate::model::EpisodeDto;
 const COLS: &str = "e.id, e.guid, e.origin, e.title, e.description, e.audio_url, e.image_url, \
                     e.pub_date, e.duration_ms, \
                     COALESCE(NULLIF(p.custom_title, ''), p.title), \
-                    ps.position_ms, COALESCE(ps.finished, 0)";
+                    ps.position_ms, COALESCE(ps.finished, 0), \
+                    p.skip_intro_sec, p.skip_outro_sec";
 
 /// 批量入库。`is_new` 是 false 表示「首次抓取当基线」，不冒几百条未读（§13）。
 pub fn insert_many(
@@ -126,5 +127,7 @@ fn to_dto(row: &rusqlite::Row<'_>) -> Result<EpisodeDto, rusqlite::Error> {
         podcast_title: row.get(9)?,
         position_sec: position_ms.and_then(ms_to_sec),
         finished: row.get::<_, i64>(11)? != 0,
+        skip_intro_sec: row.get(12)?,
+        skip_outro_sec: row.get(13)?,
     })
 }

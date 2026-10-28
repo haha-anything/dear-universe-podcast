@@ -5,4 +5,5 @@ pub mod episode;
 pub mod feed;
 pub mod legacy;
 pub mod progress;
+pub mod queue;
 pub mod session;

@@ -20,9 +20,13 @@ use tracing_subscriber::EnvFilter;
 
 use commands::{
     episode::{episode_get, episode_list},
-    feed::{feed_list, feed_subscribe, feed_unsubscribe},
+    feed::{feed_list, feed_subscribe, feed_unsubscribe, podcast_update_settings},
     legacy::{legacy_default_path, legacy_import, legacy_scan},
     progress::{progress_get, progress_save},
+    queue::{
+        queue_add, queue_clear, queue_list, queue_next, queue_remove, queue_remove_episode,
+        queue_reorder,
+    },
     session::{session_load, session_save},
 };
 use core::{db::Database, http::HttpClient};
@@ -37,12 +41,20 @@ pub fn run() {
             feed_subscribe,
             feed_list,
             feed_unsubscribe,
+            podcast_update_settings,
             episode_list,
             episode_get,
             progress_save,
             progress_get,
             session_save,
             session_load,
+            queue_list,
+            queue_add,
+            queue_remove,
+            queue_remove_episode,
+            queue_reorder,
+            queue_clear,
+            queue_next,
             legacy_default_path,
             legacy_scan,
             legacy_import,

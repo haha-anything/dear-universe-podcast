@@ -2,6 +2,12 @@
   import { player, PLAYBACK_RATES } from "../lib/player.svelte";
   import { formatDuration } from "../lib/format";
 
+  let {
+    onOpenPlayer,
+    onToggleQueue,
+    queueOpen,
+  }: { onOpenPlayer: () => void; onToggleQueue: () => void; queueOpen: boolean } = $props();
+
   let dragging = $state(false);
   let dragRatio = $state(0);
 
@@ -37,10 +43,15 @@
     <div class="h-11 w-11 shrink-0 rounded-cover border border-line bg-canvas"></div>
   {/if}
 
-  <div class="w-56 shrink-0">
+  <button
+    type="button"
+    onclick={onOpenPlayer}
+    class="w-56 shrink-0 text-left"
+    title="打开播放页"
+  >
     <p class="truncate text-sm font-medium">{player.current?.title ?? "未在播放"}</p>
     <p class="truncate text-xs text-ink-sub">{player.current?.podcastTitle ?? "选一集开始听"}</p>
-  </div>
+  </button>
 
   <div class="flex flex-1 items-center gap-3">
     <span class="w-11 shrink-0 text-right text-xs text-ink-sub tabular-nums">
@@ -124,6 +135,17 @@
       class="ml-1 h-8 w-14 rounded-pill border border-line text-xs tabular-nums text-ink-sub hover:text-ink"
       title="切换倍速">{player.rate}×</button
     >
+
+    <button
+      type="button"
+      onclick={onToggleQueue}
+      class="ml-1 h-8 rounded-pill border border-line px-2 text-xs text-ink-sub hover:text-ink {queueOpen
+        ? 'bg-canvas text-ink'
+        : ''}"
+      title="播放队列"
+    >
+      队列{player.queue.length > 0 ? ` ${player.queue.length}` : ""}
+    </button>
   </div>
 </footer>
 

@@ -3,10 +3,13 @@
   import FeedBar from "./components/FeedBar.svelte";
   import ImportPanel from "./components/ImportPanel.svelte";
   import PlayerBar from "./components/PlayerBar.svelte";
+  import PlayerPage from "./components/PlayerPage.svelte";
+  import QueueDrawer from "./components/QueueDrawer.svelte";
   import Sidebar from "./components/Sidebar.svelte";
   import { episodeGet, episodeList } from "./lib/api/episode";
-  import { feedList, feedSubscribe, feedUnsubscribe } from "./lib/api/feed";
+  import { feedList, feedSubscribe, feedUnsubscribe, podcastUpdateSettings } from "./lib/api/feed";
   import { sessionLoad } from "./lib/api/player";
+  import { queueAdd } from "./lib/api/queue";
   import { stripHtml } from "./lib/format";
   import { player } from "./lib/player.svelte";
   import type { Episode, Podcast } from "./lib/types";
@@ -17,7 +20,15 @@
   let busy = $state(false);
   let error = $state<string | null>(null);
   let showImport = $state(false);
+  let showPlayerPage = $state(false);
+  let showQueue = $state(false);
+  let showSettings = $state(false);
   let audioEl = $state<HTMLAudioElement | null>(null);
+
+  // 频道设置表单（改名 / 跳过片头片尾）
+  let editTitle = $state("");
+  let editIntro = $state(0);
+  let editOutro = $state(0);
 
   // 快速连点订阅列表时，晚到的旧结果不能覆盖新的
   let loadToken = 0;
@@ -54,12 +65,14 @@
     podcasts = list;
 
     if (podcasts[0]) await select(podcasts[0].origin);
+    await player.refreshQueue();
     await restoreLastSession();
   }
 
   async function select(origin: string): Promise<void> {
     const token = ++loadToken;
     selected = origin;
+    showSettings = false;
 
     const list = await episodeList(origin).catch((e) => {
       error = describe(e);
@@ -117,6 +130,32 @@
     if (!selected && podcasts[0]) await select(podcasts[0].origin);
   }
 
+  async function enqueue(episode: Episode): Promise<void> {
+    await queueAdd(episode.id).catch((e) => {
+      error = describe(e);
+    });
+    await player.refreshQueue();
+    if (!showQueue) showQueue = true;
+  }
+
+  function openSettings(): void {
+    if (!current) return;
+    editTitle = current.customTitle || current.title;
+    editIntro = current.skipIntroSec;
+    editOutro = current.skipOutroSec;
+    showSettings = !showSettings;
+  }
+
+  async function saveSettings(): Promise<void> {
+    if (!current) return;
+    await podcastUpdateSettings(current.origin, editTitle, editIntro, editOutro).catch((e) => {
+      error = describe(e);
+    });
+    showSettings = false;
+    await reload();
+    if (selected) await select(selected);
+  }
+
   function describe(e: unknown): string {
     if (typeof e === "string") return e;
     if (e instanceof Error) return e.message;
@@ -149,7 +188,59 @@
               {stripHtml(current.description)}
             </p>
           </div>
-          <p class="shrink-0 text-xs text-ink-weak">{current.episodeCount} 集</p>
+          <div class="flex shrink-0 flex-col items-end gap-1">
+            <p class="text-xs text-ink-weak">{current.episodeCount} 集</p>
+            <button
+              type="button"
+              onclick={openSettings}
+              class="h-7 rounded-pill border border-line px-2 text-[11px] text-ink-sub hover:bg-canvas hover:text-ink"
+              >频道设置</button
+            >
+          </div>
+        </section>
+      {/if}
+
+      {#if showSettings && current}
+        <section class="shrink-0 border-b border-line bg-canvas px-4 py-3">
+          <div class="flex flex-wrap items-end gap-3 text-xs">
+            <label class="flex flex-col gap-1">
+              <span class="text-ink-sub">频道名（改了不会被刷新覆盖）</span>
+              <input
+                bind:value={editTitle}
+                class="h-8 w-56 rounded border border-line bg-surface px-2 text-xs"
+              />
+            </label>
+            <label class="flex flex-col gap-1">
+              <span class="text-ink-sub">跳过片头（秒）</span>
+              <input
+                type="number"
+                min="0"
+                max="3600"
+                bind:value={editIntro}
+                class="h-8 w-24 rounded border border-line bg-surface px-2 text-xs"
+              />
+            </label>
+            <label class="flex flex-col gap-1">
+              <span class="text-ink-sub">跳过片尾（秒）</span>
+              <input
+                type="number"
+                min="0"
+                max="3600"
+                bind:value={editOutro}
+                class="h-8 w-24 rounded border border-line bg-surface px-2 text-xs"
+              />
+            </label>
+            <button
+              type="button"
+              onclick={() => void saveSettings()}
+              class="h-8 rounded-pill bg-accent px-3 text-xs text-white">保存</button
+            >
+            <button
+              type="button"
+              onclick={() => (showSettings = false)}
+              class="h-8 rounded-pill border border-line px-3 text-xs text-ink-sub">取消</button
+            >
+          </div>
         </section>
       {/if}
 
@@ -157,11 +248,24 @@
         {episodes}
         currentId={player.current?.id ?? null}
         onPlay={(ep) => void player.toggle(ep)}
+        onQueue={(ep) => void enqueue(ep)}
       />
     </main>
+
+    {#if showQueue}
+      <QueueDrawer onClose={() => (showQueue = false)} />
+    {/if}
   </div>
 
-  <PlayerBar />
+  <PlayerBar
+    queueOpen={showQueue}
+    onToggleQueue={() => (showQueue = !showQueue)}
+    onOpenPlayer={() => (showPlayerPage = true)}
+  />
+
+  {#if showPlayerPage}
+    <PlayerPage onClose={() => (showPlayerPage = false)} />
+  {/if}
 </div>
 
 {#if showImport}

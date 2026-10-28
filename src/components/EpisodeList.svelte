@@ -12,9 +12,10 @@
     episodes: Episode[];
     currentId: string | null;
     onPlay: (episode: Episode) => void;
+    onQueue: (episode: Episode) => void;
   }
 
-  let { episodes, currentId, onPlay }: Props = $props();
+  let { episodes, currentId, onPlay, onQueue }: Props = $props();
 
   const ROW_HEIGHT = 84;
 
@@ -99,46 +100,57 @@
             class="absolute top-0 left-0 w-full"
             style="height: {row.size}px; transform: translateY({row.start}px)"
           >
-            <button
-              type="button"
-              onclick={() => onPlay(ep)}
-              class="flex h-full w-full items-start gap-3 border-b border-line px-4 py-3 text-left {currentId ===
+            <div
+              class="flex h-full w-full items-start gap-3 border-b border-line px-4 py-3 {currentId ===
               ep.id
                 ? 'bg-surface'
                 : 'hover:bg-surface'}"
             >
-              {#if ep.imageUrl}
-                <img
-                  src={ep.imageUrl}
-                  alt=""
-                  loading="lazy"
-                  class="h-12 w-12 shrink-0 rounded-cover border border-line bg-canvas object-cover"
-                />
-              {:else}
-                <div
-                  class="h-12 w-12 shrink-0 rounded-cover border border-line bg-canvas"
-                  aria-hidden="true"
-                ></div>
-              {/if}
+              <button
+                type="button"
+                onclick={() => onPlay(ep)}
+                class="flex min-w-0 flex-1 items-start gap-3 text-left"
+              >
+                {#if ep.imageUrl}
+                  <img
+                    src={ep.imageUrl}
+                    alt=""
+                    loading="lazy"
+                    class="h-12 w-12 shrink-0 rounded-cover border border-line bg-canvas object-cover"
+                  />
+                {:else}
+                  <div
+                    class="h-12 w-12 shrink-0 rounded-cover border border-line bg-canvas"
+                    aria-hidden="true"
+                  ></div>
+                {/if}
 
-              <div class="min-w-0 flex-1">
-                <p
-                  class="truncate text-sm font-medium {currentId === ep.id
-                    ? 'text-accent'
-                    : 'text-ink'}"
-                >
-                  {ep.title}
-                </p>
-                <p class="mt-0.5 truncate text-xs text-ink-sub">
-                  {ep.podcastTitle} · {formatRelative(ep.publishedMs)} · {formatDuration(
-                    ep.durationSec,
-                  )}{#if progressLabel(ep)} · {progressLabel(ep)}{/if}
-                </p>
-                <p class="mt-0.5 line-clamp-1 text-xs text-ink-weak">
-                  {stripHtml(ep.description)}
-                </p>
-              </div>
-            </button>
+                <div class="min-w-0 flex-1">
+                  <p
+                    class="truncate text-sm font-medium {currentId === ep.id
+                      ? 'text-accent'
+                      : 'text-ink'}"
+                  >
+                    {ep.title}
+                  </p>
+                  <p class="mt-0.5 truncate text-xs text-ink-sub">
+                    {ep.podcastTitle} · {formatRelative(ep.publishedMs)} · {formatDuration(
+                      ep.durationSec,
+                    )}{#if progressLabel(ep)} · {progressLabel(ep)}{/if}
+                  </p>
+                  <p class="mt-0.5 line-clamp-1 text-xs text-ink-weak">
+                    {stripHtml(ep.description)}
+                  </p>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onclick={() => onQueue(ep)}
+                class="mt-1 h-7 shrink-0 rounded-pill border border-line px-2 text-[11px] text-ink-sub hover:bg-canvas hover:text-ink"
+                title="加入播放队列">+队列</button
+              >
+            </div>
           </div>
         {/if}
       {/each}
