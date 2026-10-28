@@ -1,4 +1,5 @@
 <script lang="ts">
+  import DiscoverPanel from "./components/DiscoverPanel.svelte";
   import EpisodeList from "./components/EpisodeList.svelte";
   import FeedBar from "./components/FeedBar.svelte";
   import ImportPanel from "./components/ImportPanel.svelte";
@@ -6,11 +7,13 @@
   import PlayerPage from "./components/PlayerPage.svelte";
   import QueueDrawer from "./components/QueueDrawer.svelte";
   import Sidebar from "./components/Sidebar.svelte";
+  import { feedRefreshAll } from "./lib/api/discover";
   import { episodeGet, episodeList } from "./lib/api/episode";
   import { feedList, feedSubscribe, feedUnsubscribe, podcastUpdateSettings } from "./lib/api/feed";
   import { sessionLoad } from "./lib/api/player";
   import { queueAdd } from "./lib/api/queue";
   import { stripHtml } from "./lib/format";
+  import { listen } from "@tauri-apps/api/event";
   import { player } from "./lib/player.svelte";
   import type { Episode, Podcast } from "./lib/types";
 
@@ -23,6 +26,10 @@
   let showPlayerPage = $state(false);
   let showQueue = $state(false);
   let showSettings = $state(false);
+  let view = $state<"subscriptions" | "discover">("subscriptions");
+  let refreshing = $state(false);
+  let refreshDone = $state(0);
+  let refreshTotal = $state(0);
   let audioEl = $state<HTMLAudioElement | null>(null);
 
   // 频道设置表单（改名 / 跳过片头片尾）
@@ -39,6 +46,15 @@
   $effect(() => {
     if (!audioEl) return;
     return player.attach(audioEl);
+  });
+
+  // 刷新进度由 Rust 侧 emit，窗口藏着的时候也在跑，所以挂全局监听
+  $effect(() => {
+    const un = listen<{ done: number; total: number }>("refresh-progress", (e) => {
+      refreshDone = e.payload.done;
+      refreshTotal = e.payload.total;
+    });
+    return () => void un.then((f) => f());
   });
 
   // 明暗双主题跟随系统（§11.3 要求 V1 就做双主题）
@@ -156,6 +172,32 @@
     if (selected) await select(selected);
   }
 
+  async function refreshAll(): Promise<void> {
+    if (refreshing) return;
+    refreshing = true;
+    refreshDone = 0;
+    refreshTotal = 0;
+    error = null;
+
+    try {
+      const summary = await feedRefreshAll(false);
+      await reload();
+      if (selected) await select(selected);
+
+      const failed = summary.failed.length;
+      error =
+        failed > 0
+          ? `${summary.total} 个源里 ${failed} 个没刷新成功`
+          : `刷完 ${summary.total} 个源，新增 ${summary.totalNew} 集，用时 ${(summary.elapsedMs / 1000).toFixed(1)}s`;
+    } catch (e) {
+      error = describe(e);
+    } finally {
+      refreshing = false;
+      refreshDone = 0;
+      refreshTotal = 0;
+    }
+  }
+
   function describe(e: unknown): string {
     if (typeof e === "string") return e;
     if (e instanceof Error) return e.message;
@@ -167,8 +209,20 @@
   <FeedBar {busy} {error} onSubmit={subscribe} onOpenImport={() => (showImport = true)} />
 
   <div class="flex min-h-0 flex-1">
-    <Sidebar {podcasts} {selected} onSelect={select} onUnsubscribe={unsubscribe} />
+    <Sidebar
+      {podcasts}
+      {selected}
+      {view}
+      {refreshing}
+      onView={(v) => (view = v === "discover" ? "discover" : "subscriptions")}
+      onSelect={select}
+      onUnsubscribe={unsubscribe}
+      onRefreshAll={() => void refreshAll()}
+    />
 
+    {#if view === "discover"}
+      <DiscoverPanel onSubscribed={() => void reload()} />
+    {:else}
     <main class="flex min-w-0 flex-1 flex-col">
       {#if current}
         <section class="flex shrink-0 gap-4 border-b border-line bg-surface px-4 py-3">
@@ -251,11 +305,18 @@
         onQueue={(ep) => void enqueue(ep)}
       />
     </main>
+    {/if}
 
     {#if showQueue}
       <QueueDrawer onClose={() => (showQueue = false)} />
     {/if}
   </div>
+
+  {#if refreshing && refreshTotal > 0}
+    <p class="shrink-0 border-t border-line bg-surface px-4 py-1 text-xs text-ink-sub">
+      刷新中 {refreshDone}/{refreshTotal}
+    </p>
+  {/if}
 
   <PlayerBar
     queueOpen={showQueue}

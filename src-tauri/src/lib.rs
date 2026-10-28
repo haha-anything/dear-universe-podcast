@@ -19,9 +19,14 @@ use tauri::{Manager, WindowEvent};
 use tracing_subscriber::EnvFilter;
 
 use commands::{
+    discover::{
+        discover_search, discover_top, feed_keep_limit, feed_mark_all_played, feed_refresh,
+        feed_refresh_all,
+    },
     episode::{episode_get, episode_list},
     feed::{feed_list, feed_subscribe, feed_unsubscribe, podcast_update_settings},
     legacy::{legacy_default_path, legacy_import, legacy_scan},
+    opml::{opml_export, opml_import, opml_scan},
     progress::{progress_get, progress_save},
     queue::{
         queue_add, queue_clear, queue_list, queue_next, queue_remove, queue_remove_episode,
@@ -29,7 +34,11 @@ use commands::{
     },
     session::{session_load, session_save},
 };
-use core::{db::Database, http::HttpClient};
+use core::{
+    db::{self, Database},
+    http::HttpClient,
+    sources::apple::AppleClient,
+};
 
 pub fn run() {
     init_logging();
@@ -41,7 +50,16 @@ pub fn run() {
             feed_subscribe,
             feed_list,
             feed_unsubscribe,
+            feed_refresh,
+            feed_refresh_all,
+            feed_mark_all_played,
+            feed_keep_limit,
             podcast_update_settings,
+            discover_top,
+            discover_search,
+            opml_scan,
+            opml_import,
+            opml_export,
             episode_list,
             episode_get,
             progress_save,
@@ -63,8 +81,17 @@ pub fn run() {
             let data_dir = app.path().app_data_dir()?;
             tracing::info!(dir = %data_dir.display(), "数据目录");
 
-            app.manage(Database::open_in(&data_dir)?);
+            let db = std::sync::Arc::new(Database::open_in(&data_dir)?);
+            app.manage(db.clone());
+            app.manage(db::Shared(db));
             app.manage(HttpClient::new()?);
+            // 目录服务起不来不能拖累启动：失败就退化成「发现页为空」
+            match AppleClient::new() {
+                Ok(client) => {
+                    app.manage(client);
+                }
+                Err(e) => tracing::warn!(error = %e, "Apple 目录客户端初始化失败，发现页将为空"),
+            }
             tray::setup(app)?;
             Ok(())
         })

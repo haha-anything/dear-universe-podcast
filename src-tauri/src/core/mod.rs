@@ -4,4 +4,6 @@ pub mod db;
 pub mod feed;
 pub mod http;
 pub mod legacy;
+pub mod opml;
+pub mod sources;
 pub mod subscription;

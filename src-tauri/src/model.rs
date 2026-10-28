@@ -104,6 +104,53 @@ pub struct SessionDto {
     pub volume: i32,
 }
 
+/// 目录里的一条节目预览（Apple 搜索 / 榜单的结果）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PodcastPreviewDto {
+    pub id: String,
+    pub title: String,
+    pub author: Option<String>,
+    /// 订阅要用的 RSS 地址。Apple 只给这个，音频仍从源站拉。
+    pub feed_url: String,
+    pub image_url: Option<String>,
+    pub genre: Option<String>,
+    pub episode_count: i64,
+}
+
+/// 单个节目的刷新结果
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RefreshOutcome {
+    pub origin: String,
+    pub new_episodes: u32,
+    /// 服务端回 304，内容没变
+    pub not_modified: bool,
+    /// 距上次刷新不到 10 分钟，跳过
+    pub skipped: bool,
+}
+
+/// 批量刷新的汇总
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RefreshSummary {
+    pub total: usize,
+    pub total_new: u32,
+    /// 失败的源地址。单个源失败不影响整体。
+    pub failed: Vec<String>,
+    pub elapsed_ms: i64,
+}
+
+/// OPML 导入结果
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OpmlImportReport {
+    pub imported: usize,
+    /// 已经订阅过的，跳过
+    pub skipped: usize,
+    pub errors: Vec<String>,
+}
+
 /// dry-run 报告：让用户先看清会写进去什么，再决定要不要导。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

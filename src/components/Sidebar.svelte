@@ -5,11 +5,29 @@
   interface Props {
     podcasts: Podcast[];
     selected: string | null;
+    view: string;
+    onView: (view: string) => void;
     onSelect: (origin: string) => void;
     onUnsubscribe: (podcast: Podcast) => void;
+    onRefreshAll: () => void;
+    refreshing: boolean;
   }
 
-  let { podcasts, selected, onSelect, onUnsubscribe }: Props = $props();
+  let {
+    podcasts,
+    selected,
+    view,
+    onView,
+    onSelect,
+    onUnsubscribe,
+    onRefreshAll,
+    refreshing,
+  }: Props = $props();
+
+  const TABS: ReadonlyArray<{ id: string; label: string }> = [
+    { id: "subscriptions", label: "订阅" },
+    { id: "discover", label: "发现" },
+  ];
 
   function displayName(podcast: Podcast): string {
     return podcast.customTitle || podcast.title;
@@ -20,9 +38,28 @@
   class="flex w-[220px] shrink-0 flex-col border-r border-line bg-surface"
   aria-label="订阅列表"
 >
-  <p class="flex h-9 shrink-0 items-center px-3 text-xs text-ink-sub">
-    订阅 {podcasts.length}
-  </p>
+  <div class="flex h-9 shrink-0 items-center gap-1 border-b border-line px-2">
+    {#each TABS as tab (tab.id)}
+      <button
+        type="button"
+        onclick={() => onView(tab.id)}
+        class="h-7 flex-1 rounded-pill text-xs {view === tab.id
+          ? 'bg-canvas text-ink'
+          : 'text-ink-sub hover:text-ink'}">{tab.label}</button
+      >
+    {/each}
+  </div>
+
+  <div class="flex h-9 shrink-0 items-center justify-between px-3">
+    <span class="text-xs text-ink-sub">订阅 {podcasts.length}</span>
+    <button
+      type="button"
+      onclick={onRefreshAll}
+      disabled={refreshing}
+      class="h-6 rounded-pill border border-line px-2 text-[11px] text-ink-sub hover:text-ink disabled:opacity-40"
+      >{refreshing ? "刷新中…" : "刷新"}</button
+    >
+  </div>
 
   <div class="min-h-0 flex-1 overflow-y-auto pb-2">
     {#if podcasts.length === 0}

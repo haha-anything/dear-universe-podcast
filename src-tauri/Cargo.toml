@@ -30,8 +30,9 @@ serde_json = "1"
 rusqlite = { version = "0.32", features = ["bundled"] }
 
 # rustls 而不是 openssl：Windows 上 openssl 是噩梦（任务书 §4）
-reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "gzip"] }
-tokio = { version = "1", features = ["rt-multi-thread", "macros", "time"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "gzip", "json"] }
+# sync：刷新要用 Semaphore 把并发压到 3（任务书 §13）
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "sync"] }
 feed-rs = "2"
 url = "2"
 

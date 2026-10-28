@@ -9,6 +9,7 @@ pub mod play_state;
 pub mod podcast;
 pub mod queue;
 pub mod session;
+pub mod subscription;
 
 use std::path::Path;
 use std::sync::{Mutex, MutexGuard};
@@ -34,6 +35,14 @@ const MIGRATIONS: &[(&str, &str)] = &[
 pub struct Database {
     conn: Mutex<Connection>,
 }
+
+/// 跨 tokio 任务共享用的句柄。
+///
+/// Tauri 的 `State::inner()` 只给 `&T`，拿不到它内部那个 `Arc`，
+/// 而刷新要 `tokio::spawn`（任务要求 'static），所以额外注册一个包了 Arc 的类型。
+/// 和 `Database` 注册的是**同一个实例**，不是两份连接。
+#[derive(Clone)]
+pub struct Shared(pub std::sync::Arc<Database>);
 
 impl Database {
     /// 打开（必要时创建）数据目录下的 `dear-universe.db` 并跑到最新迁移。

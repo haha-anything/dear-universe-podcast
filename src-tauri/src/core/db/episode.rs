@@ -96,6 +96,60 @@ pub fn get(conn: &Connection, id: &str) -> Result<Option<EpisodeDto>, rusqlite::
     .optional()
 }
 
+/// 这个节目已有的 guid 集合。刷新时用它判断哪些是新的（§13 按 guid 比对）。
+pub fn existing_guids(
+    conn: &Connection,
+    origin: &str,
+) -> Result<std::collections::HashSet<String>, rusqlite::Error> {
+    let mut stmt = conn.prepare(
+        "SELECT guid FROM episode WHERE origin = ?1 AND guid IS NOT NULL AND guid != ''",
+    )?;
+    let rows = stmt.query_map(params![origin], |row| row.get(0))?;
+
+    let mut out = std::collections::HashSet::new();
+    for row in rows {
+        out.insert(row?);
+    }
+    Ok(out)
+}
+
+pub fn count_by_origin(conn: &Connection, origin: &str) -> Result<i64, rusqlite::Error> {
+    conn.query_row(
+        "SELECT COUNT(*) FROM episode WHERE origin = ?1",
+        params![origin],
+        |r| r.get(0),
+    )
+}
+
+/// 「全部标为已播」：把未读标记清掉
+pub fn mark_all_played(conn: &Connection, origin: &str) -> Result<usize, rusqlite::Error> {
+    conn.execute(
+        "UPDATE episode SET is_new = 0 WHERE origin = ?1 AND is_new = 1",
+        params![origin],
+    )
+}
+
+/// 刷新后的清理：每个节目只留最新 `keep` 条。
+///
+/// 三类**只更新不删除**（§13）：被收藏的、有播放进度的、在队列里的。
+/// 删掉它们等于把用户的进度和收藏一起扔了，参考实现就是这么丢数据的。
+pub fn prune_beyond(conn: &Connection, origin: &str, keep: i64) -> Result<usize, rusqlite::Error> {
+    conn.execute(
+        "DELETE FROM episode
+          WHERE origin = ?1
+            AND id NOT IN (
+                SELECT id FROM episode
+                 WHERE origin = ?1
+                 ORDER BY pub_date DESC
+                 LIMIT ?2
+            )
+            AND id NOT IN (SELECT episode_id FROM favorite)
+            AND id NOT IN (SELECT episode_id FROM play_state)
+            AND id NOT IN (SELECT episode_id FROM queue_item WHERE episode_id IS NOT NULL)",
+        params![origin, keep],
+    )
+}
+
 /// 毫秒 → 秒。库里 0 表示「没解析到时长」，转成 None 让前端显示 `--:--`。
 pub(crate) fn ms_to_sec(ms: i64) -> Option<i64> {
     (ms > 0).then(|| ms / 1000)

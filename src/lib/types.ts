@@ -68,6 +68,38 @@ export interface PlayerSession {
   volume: number;
 }
 
+/** 目录里的一条节目（Apple 搜索 / 榜单结果） */
+export interface PodcastPreview {
+  id: string;
+  title: string;
+  author: string | null;
+  /** 订阅要用的 RSS 地址 */
+  feedUrl: string;
+  imageUrl: string | null;
+  genre: string | null;
+  episodeCount: number;
+}
+
+export interface RefreshOutcome {
+  origin: string;
+  newEpisodes: number;
+  notModified: boolean;
+  skipped: boolean;
+}
+
+export interface RefreshSummary {
+  total: number;
+  totalNew: number;
+  failed: string[];
+  elapsedMs: number;
+}
+
+export interface OpmlImportReport {
+  imported: number;
+  skipped: number;
+  errors: string[];
+}
+
 export interface LegacyCounts {
   podcasts: number;
   episodes: number;

@@ -19,29 +19,75 @@ use crate::{
 const MAX_EPISODES: usize = 500;
 
 pub async fn fetch_feed(client: &Client, feed_url: &str) -> Result<FeedDto, AppError> {
-    tracing::info!(feed_url, "拉取 RSS");
+    match fetch_conditional(client, feed_url, None, None).await? {
+        Fetched::Changed { feed, .. } => Ok(feed),
+        // 不带缓存头却回 304 是不可能发生的事，真发生了就当失败
+        Fetched::NotModified => Err(AppError::Http { status: 304 }),
+    }
+}
 
-    let resp = client.get(feed_url).send().await?;
+/// 一次抓取的结果
+pub enum Fetched {
+    /// 内容有变。顺带把响应里的缓存头带出来，下次请求要带上。
+    Changed {
+        feed: FeedDto,
+        etag: Option<String>,
+        last_modified: Option<String>,
+    },
+    /// 服务端回 304：内容没变，连解析都省了
+    NotModified,
+}
 
+/// 带条件头的抓取。刷新走这条：命中 304 就不解析，省流量也省 CPU（§17.4）。
+pub async fn fetch_conditional(
+    client: &Client,
+    feed_url: &str,
+    etag: Option<&str>,
+    last_modified: Option<&str>,
+) -> Result<Fetched, AppError> {
+    tracing::info!(feed_url, has_etag = etag.is_some(), "拉取 RSS");
+
+    let mut req = client.get(feed_url);
+    if let Some(tag) = etag.filter(|s| !s.is_empty()) {
+        req = req.header(reqwest::header::IF_NONE_MATCH, tag);
+    }
+    if let Some(since) = last_modified.filter(|s| !s.is_empty()) {
+        req = req.header(reqwest::header::IF_MODIFIED_SINCE, since);
+    }
+
+    let resp = req.send().await?;
     let status = resp.status();
+
+    if status == reqwest::StatusCode::NOT_MODIFIED {
+        return Ok(Fetched::NotModified);
+    }
     if !status.is_success() {
         return Err(AppError::Http {
             status: status.as_u16(),
         });
     }
 
-    let bytes = resp.bytes().await?;
+    let etag = header_string(resp.headers().get(reqwest::header::ETAG));
+    let last_modified = header_string(resp.headers().get(reqwest::header::LAST_MODIFIED));
 
-    // feed-rs 对脏 XML 容忍度有限（任务书 §14.5）。
-    // M0 阶段解析失败就如实报错；兜底的正则降级会在 M1 加上，那里才会影响可用性。
+    let bytes = resp.bytes().await?;
     let feed = feed_rs::parser::parse(&bytes[..]).map_err(|e| AppError::FeedParse(e.to_string()))?;
 
-    tracing::info!(
-        entries = feed.entries.len(),
-        "RSS 解析完成"
-    );
+    tracing::info!(entries = feed.entries.len(), "RSS 解析完成");
 
-    Ok(convert(feed_url, &feed))
+    Ok(Fetched::Changed {
+        feed: convert(feed_url, &feed),
+        etag,
+        last_modified,
+    })
+}
+
+fn header_string(value: Option<&reqwest::header::HeaderValue>) -> Option<String> {
+    value
+        .and_then(|v| v.to_str().ok())
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_string)
 }
 
 fn convert(feed_url: &str, feed: &Feed) -> FeedDto {
