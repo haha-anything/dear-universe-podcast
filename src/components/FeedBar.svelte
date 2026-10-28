@@ -1,12 +1,14 @@
 <script lang="ts">
   interface Props {
-    url: string;
-    loading: boolean;
+    busy: boolean;
     error: string | null;
-    onSubmit: () => void;
+    onSubmit: (url: string) => void;
+    onOpenImport: () => void;
   }
 
-  let { url = $bindable(""), loading, error, onSubmit }: Props = $props();
+  let { busy, error, onSubmit, onOpenImport }: Props = $props();
+
+  let url = $state("");
 
   // 几个随手能用上的示例源，省得每次去找 feed 地址
   const SAMPLES: ReadonlyArray<{ label: string; url: string }> = [
@@ -14,6 +16,11 @@
     { label: "Planet Money", url: "https://feeds.npr.org/510289/podcast.xml" },
     { label: "Lex Fridman", url: "https://lexfridman.com/feed/podcast/" },
   ];
+
+  function submit(target: string): void {
+    if (busy || target.trim().length === 0) return;
+    onSubmit(target.trim());
+  }
 </script>
 
 <header
@@ -25,7 +32,7 @@
     class="flex min-w-[280px] flex-1 items-center gap-2"
     onsubmit={(e) => {
       e.preventDefault();
-      onSubmit();
+      submit(url);
     }}
   >
     <input
@@ -37,10 +44,10 @@
     />
     <button
       type="submit"
-      disabled={loading || url.trim().length === 0}
+      disabled={busy || url.trim().length === 0}
       class="h-9 shrink-0 rounded-pill bg-accent px-4 text-sm font-medium text-white disabled:opacity-40"
     >
-      {loading ? "加载中…" : "加载"}
+      {busy ? "订阅中…" : "订阅"}
     </button>
   </form>
 
@@ -50,13 +57,20 @@
         type="button"
         onclick={() => {
           url = sample.url;
-          onSubmit();
+          submit(sample.url);
         }}
         class="rounded-pill border border-line px-2.5 py-1 text-xs text-ink-sub hover:text-ink"
       >
         {sample.label}
       </button>
     {/each}
+    <button
+      type="button"
+      onclick={onOpenImport}
+      class="ml-1 rounded-pill border border-accent px-2.5 py-1 text-xs text-accent hover:bg-accent hover:text-white"
+    >
+      从旧版导入
+    </button>
   </div>
 </header>
 

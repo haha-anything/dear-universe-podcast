@@ -1,8 +1,8 @@
 # Rust 侧依赖。
 #
-# 只装当前接通的功能真正用到的东西。M0 阶段范围是：
-# 拉 RSS / 解析 / 传给前端 / 托盘后台播放。
-# 数据库、下载、更新等在各自的里程碑再补（AGENTS.md：不写没接通的死代码）。
+# 只装当前接通的功能真正用到的东西。目前的接通范围是：
+# 拉 RSS / 解析 / 播放 / 托盘后台 / SQLite 持久化与旧库导入（M1）。
+# 下载、自动更新、通知等在各自的里程碑再补（AGENTS.md：不写没接通的死代码）。
 
 [package]
 name = "dear-universe-podcast"
@@ -26,6 +26,9 @@ tauri = { version = "2", features = ["tray-icon"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
+# bundled：把 SQLite 编进二进制，用户机器上不需要预装 SQLite（任务书 §4）
+rusqlite = { version = "0.32", features = ["bundled"] }
+
 # rustls 而不是 openssl：Windows 上 openssl 是噩梦（任务书 §4）
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "gzip"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "time"] }
@@ -36,6 +39,10 @@ thiserror = "2"
 anyhow = "1"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[dev-dependencies]
+# 测试要用临时目录当数据目录，跑完自动清理
+tempfile = "3"
 
 # 打包瘦身见 https://tauri.app/concept/size/#cargo-configuration
 [profile.release]

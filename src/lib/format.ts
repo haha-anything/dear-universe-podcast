@@ -15,19 +15,17 @@ const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
 
-/** RFC3339 / RFC2822 → 相对时间。解析不了就原样返回。 */
-export function formatRelative(publishedAt: string | null | undefined): string {
-  if (!publishedAt) return "";
-  const t = Date.parse(publishedAt);
-  if (Number.isNaN(t)) return publishedAt;
-
-  const diff = Date.now() - t;
+/** epoch 毫秒 → 相对时间。 */
+export function formatRelative(publishedMs: number | null | undefined): string {
+  if (!publishedMs) return "";
+  const diff = Date.now() - publishedMs;
+  if (diff < 0) return "";
   if (diff < MINUTE) return "刚刚";
   if (diff < HOUR) return `${Math.floor(diff / MINUTE)} 分钟前`;
   if (diff < DAY) return `${Math.floor(diff / HOUR)} 小时前`;
   if (diff < 30 * DAY) return `${Math.floor(diff / DAY)} 天前`;
 
-  const d = new Date(t);
+  const d = new Date(publishedMs);
   return `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, "0")}-${d
     .getDate()
     .toString()

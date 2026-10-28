@@ -69,6 +69,16 @@
     tick;
     return virtualizer.getTotalSize();
   });
+
+  /** 听过但没听完的，标一下听到哪了 */
+  function progressLabel(ep: Episode): string {
+    if (ep.finished) return "已听完";
+    const done = ep.positionSec ?? 0;
+    if (done <= 5) return "";
+    const total = ep.durationSec ?? 0;
+    if (total > 0 && done / total > 0.98) return "已听完";
+    return `听到 ${formatDuration(done)}`;
+  }
 </script>
 
 <div
@@ -120,9 +130,9 @@
                   {ep.title}
                 </p>
                 <p class="mt-0.5 truncate text-xs text-ink-sub">
-                  {ep.podcastTitle} · {formatRelative(ep.publishedAt)} · {formatDuration(
+                  {ep.podcastTitle} · {formatRelative(ep.publishedMs)} · {formatDuration(
                     ep.durationSec,
-                  )}
+                  )}{#if progressLabel(ep)} · {progressLabel(ep)}{/if}
                 </p>
                 <p class="mt-0.5 line-clamp-1 text-xs text-ink-weak">
                   {stripHtml(ep.description)}
