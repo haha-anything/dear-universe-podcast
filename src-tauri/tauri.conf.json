@@ -39,6 +39,15 @@
       "webviewInstallMode": {
         "type": "embedBootstrapper"
       }
+    },
+    "createUpdaterArtifacts": true
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDQ0RjczRTY5Q0U0NUI0RjYKUldUMnRFWE9hVDczUk8xWWZ1TVFpVytvRW8wR1B5MTJzVnEyaVZGclZOM3hLNEhqbm1aRy8wdEcK",
+      "endpoints": [
+        "https://github.com/haha-anything/dear-universe-podcast/releases/latest/download/latest.json"
+      ]
     }
   }
 }

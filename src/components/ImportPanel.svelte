@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { open as openDialog } from "@tauri-apps/plugin-dialog";
   import { legacyDefaultPath, legacyImport, legacyScan } from "../lib/api/legacy";
   import type { ImportReport, LegacyScanReport } from "../lib/types";
 
@@ -39,6 +40,14 @@
     } finally {
       scanning = false;
     }
+  }
+
+  async function browse(): Promise<void> {
+    const picked = await openDialog({
+      multiple: false,
+      filters: [{ name: "Podara 数据库", extensions: ["db"] }],
+    }).catch(() => null);
+    if (picked && typeof picked === "string") path = picked;
   }
 
   async function runImport(): Promise<void> {
@@ -89,6 +98,14 @@
         placeholder="podara.db 的路径"
         class="h-9 min-w-0 flex-1 rounded-pill border border-line bg-canvas px-3 text-body outline-none focus:border-accent"
       />
+      <button
+        type="button"
+        onclick={() => void browse()}
+        disabled={scanning || importing}
+        class="h-9 shrink-0 rounded-pill border border-line px-3 text-sm text-ink-sub hover:text-ink disabled:opacity-40"
+      >
+        浏览
+      </button>
       <button
         type="button"
         onclick={scan}

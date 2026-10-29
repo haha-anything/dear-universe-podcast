@@ -55,6 +55,18 @@ pub fn run() {
     tracing::info!("启动");
 
     tauri::Builder::default()
+        // 单实例锁：第二个实例启动时聚焦已有窗口，避免抢同一个 DB（§18.5）
+        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+            if let Some(w) = app.get_webview_window("main") {
+                let _ = w.show();
+                let _ = w.set_focus();
+            }
+        }))
+        .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_process::init())
         .invoke_handler(tauri::generate_handler![
             feed_subscribe,
             feed_list,

@@ -25,3 +25,8 @@ export function feedRefreshAll(force: boolean): Promise<RefreshSummary> {
 export function feedMarkAllPlayed(origin: string): Promise<void> {
   return invoke<void>("feed_mark_all_played", { origin });
 }
+
+/** 每个节目保留的单集数（设置页展示用） */
+export function feedKeepLimit(): Promise<number> {
+  return invoke<number>("feed_keep_limit");
+}

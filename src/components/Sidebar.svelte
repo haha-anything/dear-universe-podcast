@@ -28,6 +28,7 @@
     { id: "subscriptions", label: "订阅" },
     { id: "discover", label: "发现" },
     { id: "library", label: "资料库" },
+    { id: "settings", label: "设置" },
   ];
 
   function displayName(podcast: Podcast): string {

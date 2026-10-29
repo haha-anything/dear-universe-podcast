@@ -4,11 +4,11 @@
 
 Tauri 2 + Svelte 5 + Rust + SQLite。冷启动 <1.5s，空闲内存 <120MB，安装包 <15MB。
 
-> 状态：**M0 已完成**（粘贴 RSS → 单集列表 → 播放 → 打包）。
-> 验收记录见 `docs/M0-验收.md`，功能清单见 `docs/开发任务书.md`。
+> 状态：**M5 已完成**（全里程碑：订阅 / 播放 / 进度 / 发现 / 资料库 / 打磨发布）。
+> 各阶段验收记录见 `docs/M*-验收.md`，功能清单见 `docs/开发任务书.md`。
 >
-> M0 交付物：`release/dear-universe-podcast_0.1.0_windows-x64_portable.zip`
-> （单文件 exe，5.6 MB，免安装）
+> 交付物：`release/dear-universe-podcast_0.1.0_windows-x64_portable.zip`
+> （单文件 exe，约 7.8 MB，免安装，双击即用）
 
 ---
 

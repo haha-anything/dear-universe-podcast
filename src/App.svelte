@@ -7,8 +7,11 @@
   import PlayerBar from "./components/PlayerBar.svelte";
   import PlayerPage from "./components/PlayerPage.svelte";
   import QueueDrawer from "./components/QueueDrawer.svelte";
+  import SettingsPanel from "./components/SettingsPanel.svelte";
   import Sidebar from "./components/Sidebar.svelte";
   import { feedRefreshAll } from "./lib/api/discover";
+  import { notifyNewEpisodes } from "./lib/api/notify";
+  import { theme } from "./lib/theme.svelte";
   import { episodeGet, episodeList } from "./lib/api/episode";
   import { feedList, feedSubscribe, feedUnsubscribe, podcastUpdateSettings } from "./lib/api/feed";
   import { sessionLoad } from "./lib/api/player";
@@ -28,7 +31,7 @@
   let showPlayerPage = $state(false);
   let showQueue = $state(false);
   let showSettings = $state(false);
-  let view = $state<"subscriptions" | "discover" | "library">("subscriptions");
+  let view = $state<"subscriptions" | "discover" | "library" | "settings">("subscriptions");
   let refreshing = $state(false);
   let refreshDone = $state(0);
   let refreshTotal = $state(0);
@@ -60,15 +63,25 @@
     return () => void un.then((f) => f());
   });
 
-  // 明暗双主题跟随系统（§11.3 要求 V1 就做双主题）
+  // 明暗双主题：跟随系统 / 浅色 / 深色，可在设置页切换（§11.3）
+  $effect(() => theme.init());
+
+  // 托盘菜单的媒体控制走 media-key 事件，和 mediaSession 用同一套播放逻辑
   $effect(() => {
-    const mq = window.matchMedia("(prefers-color-scheme: dark)");
-    const apply = () => {
-      document.documentElement.dataset.theme = mq.matches ? "dark" : "light";
-    };
-    apply();
-    mq.addEventListener("change", apply);
-    return () => mq.removeEventListener("change", apply);
+    const un = listen<{ action: string }>("media-key", (e) => {
+      switch (e.payload.action) {
+        case "play":
+          player.togglePlayPause();
+          break;
+        case "next":
+          void player.playNext();
+          break;
+        case "prev":
+          player.playPrev();
+          break;
+      }
+    });
+    return () => void un.then((f) => f());
   });
 
   // 启动时：读订阅列表 + 恢复上次在听的那一集（不自动播）
@@ -210,6 +223,7 @@
         failed > 0
           ? `${summary.total} 个源里 ${failed} 个没刷新成功`
           : `刷完 ${summary.total} 个源，新增 ${summary.totalNew} 集，用时 ${(summary.elapsedMs / 1000).toFixed(1)}s`;
+      void notifyNewEpisodes(summary.totalNew);
     } catch (e) {
       error = describe(e);
     } finally {
@@ -236,7 +250,8 @@
       {view}
       {refreshing}
       onView={(v) =>
-        (view = v === "discover" ? "discover" : v === "library" ? "library" : "subscriptions")}
+        (view =
+          v === "discover" ? "discover" : v === "library" ? "library" : v === "settings" ? "settings" : "subscriptions")}
       onSelect={select}
       onUnsubscribe={unsubscribe}
       onRefreshAll={() => void refreshAll()}
@@ -246,6 +261,11 @@
       <DiscoverPanel onSubscribed={() => void reload()} />
     {:else if view === "library"}
       <LibraryPanel />
+    {:else if view === "settings"}
+      <SettingsPanel
+        onOpenImport={() => (showImport = true)}
+        onOpmlImported={() => void reload()}
+      />
     {:else}
     <main class="flex min-w-0 flex-1 flex-col">
       {#if current}

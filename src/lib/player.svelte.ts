@@ -194,6 +194,34 @@ class Player {
     });
   }
 
+  /** 播放 / 暂停切换（托盘菜单、media-key 事件用） */
+  togglePlayPause(): void {
+    const el = this.#el;
+    if (!el || !this.current) return;
+    if (el.paused) void el.play();
+    else el.pause();
+  }
+
+  /** 下一集：优先队列下一项，没有就停 */
+  async playNext(): Promise<void> {
+    const el = this.#el;
+    if (!el) return;
+    await this.#flush();
+    const next = await queueNext(this.current?.id ?? "").catch(() => null);
+    if (next) {
+      await this.playQueueItem(next);
+    } else {
+      el.pause();
+    }
+  }
+
+  /** 上一集：播过头 3 秒就回到开头，符合常见播放器语义 */
+  playPrev(): void {
+    const el = this.#el;
+    if (!el || !this.current) return;
+    if (el.currentTime > 3) void this.seek(0);
+  }
+
   /** 重启恢复：把上次的集和位置摆回界面，**不自动播** */
   restore(episode: Episode, positionSec: number): void {
     const el = this.#el;

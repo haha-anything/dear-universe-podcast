@@ -1,8 +1,7 @@
 # Rust 侧依赖。
 #
-# 只装当前接通的功能真正用到的东西。目前的接通范围是：
-# 拉 RSS / 解析 / 播放 / 托盘后台 / SQLite 持久化与旧库导入（M1）。
-# 下载、自动更新、通知等在各自的里程碑再补（AGENTS.md：不写没接通的死代码）。
+# 只装当前接通的功能真正用到的东西（AGENTS.md：不写没接通的死代码）。
+# 接通范围随里程碑推进：M1 数据层 → M4 下载 → M5 通知/更新/单实例。
 
 [package]
 name = "dear-universe-podcast"
@@ -23,6 +22,14 @@ tauri-build = { version = "2", features = [] }
 # tray-icon：M0 就要验证「最小化到托盘后音频不能断」
 # protocol-asset：M4 离线播放，把已下载的本地音频交给 WebView 播（asset:// 协议）
 tauri = { version = "2", features = ["tray-icon", "protocol-asset"] }
+
+# M5 发布能力：通知、自动更新、单实例锁、打开外链、文件选择
+tauri-plugin-notification = "2"
+tauri-plugin-updater = "2"
+tauri-plugin-single-instance = "2"
+tauri-plugin-opener = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-process = "2"
 
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
