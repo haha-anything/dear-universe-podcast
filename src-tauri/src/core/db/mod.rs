@@ -3,7 +3,9 @@
 //! AGENTS.md：所有 SQL 只出现在 `core/db/` 这个模块及其子模块里，
 //! 业务层和命令层一律看不见 SQL 字符串。
 
+pub mod download;
 pub mod episode;
+pub mod favorite;
 pub mod history;
 pub mod play_state;
 pub mod podcast;

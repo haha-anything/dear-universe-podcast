@@ -244,6 +244,13 @@ impl AppleClient {
             }
             // lookup 没命中的直接跳过：榜单条目没有 feedUrl，
             // 给用户一个订不了的按钮比不给更糟（§6.2 不许转存，也就没得兜底）
+            else {
+                tracing::debug!(
+                    name = %entry.name.label,
+                    artist = %entry.artist.as_ref().map(|a| a.label.as_str()).unwrap_or(""),
+                    "榜单条目没查到 feedUrl，跳过"
+                );
+            }
         }
 
         self.remember(&key, false, &out);

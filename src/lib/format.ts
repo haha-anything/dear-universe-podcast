@@ -32,6 +32,16 @@ export function formatRelative(publishedMs: number | null | undefined): string {
     .padStart(2, "0")}`;
 }
 
+/** 字节 → "3.4 MB"。下载面板用，1024 进制。 */
+export function formatBytes(bytes: number | null | undefined): string {
+  const n = bytes ?? 0;
+  if (n <= 0) return "0 B";
+  const units = ["B", "KB", "MB", "GB"];
+  const i = Math.min(Math.floor(Math.log(n) / Math.log(1024)), units.length - 1);
+  const value = n / 1024 ** i;
+  return `${value >= 100 || i === 0 ? Math.round(value) : value.toFixed(1)} ${units[i]}`;
+}
+
 /** HTML 富文本 → 纯文本，RSS 描述里全是标签 */
 export function stripHtml(html: string | null | undefined): string {
   if (!html) return "";

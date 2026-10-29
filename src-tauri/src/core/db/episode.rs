@@ -8,11 +8,42 @@ use rusqlite::{params, Connection, OptionalExtension};
 
 use crate::model::EpisodeDto;
 
-const COLS: &str = "e.id, e.guid, e.origin, e.title, e.description, e.audio_url, e.image_url, \
-                    e.pub_date, e.duration_ms, \
-                    COALESCE(NULLIF(p.custom_title, ''), p.title), \
-                    ps.position_ms, COALESCE(ps.finished, 0), \
-                    p.skip_intro_sec, p.skip_outro_sec";
+/// 单集的列。历史 / 收藏要复用这一整套（连同 JOIN），所以对外可见。
+pub(crate) const COLS: &str =
+    "e.id, e.guid, e.origin, e.title, e.description, e.audio_url, e.image_url, \
+     e.pub_date, e.duration_ms, \
+     COALESCE(NULLIF(p.custom_title, ''), p.title), \
+     ps.position_ms, COALESCE(ps.finished, 0), \
+     p.skip_intro_sec, p.skip_outro_sec";
+
+/// 从 `offset` 开始按 [`COLS`] 的顺序读一条单集。
+/// 历史、收藏这类查询会把自己的列放在前面，所以偏移量是参数。
+pub fn row_to_dto(
+    row: &rusqlite::Row<'_>,
+    offset: usize,
+) -> Result<EpisodeDto, rusqlite::Error> {
+    let position_ms: Option<i64> = row.get(offset + 10)?;
+
+    Ok(EpisodeDto {
+        id: row.get(offset)?,
+        guid: row.get(offset + 1)?,
+        origin: row.get(offset + 2)?,
+        title: row.get(offset + 3)?,
+        description: row.get(offset + 4)?,
+        audio_url: row.get(offset + 5)?,
+        image_url: row.get(offset + 6)?,
+        published_ms: match row.get::<_, i64>(offset + 7)? {
+            0 => None,
+            ms => Some(ms),
+        },
+        duration_sec: ms_to_sec(row.get(offset + 8)?),
+        podcast_title: row.get(offset + 9)?,
+        position_sec: position_ms.and_then(ms_to_sec),
+        finished: row.get::<_, i64>(offset + 11)? != 0,
+        skip_intro_sec: row.get(offset + 12)?,
+        skip_outro_sec: row.get(offset + 13)?,
+    })
+}
 
 /// 批量入库。`is_new` 是 false 表示「首次抓取当基线」，不冒几百条未读（§13）。
 pub fn insert_many(
@@ -161,27 +192,5 @@ pub(crate) fn sec_to_ms(sec: Option<i64>) -> i64 {
 }
 
 fn to_dto(row: &rusqlite::Row<'_>) -> Result<EpisodeDto, rusqlite::Error> {
-    // LEFT JOIN play_state：没播过的这列是 NULL，不能直接 get i64
-    let position_ms: Option<i64> = row.get(10)?;
-
-    Ok(EpisodeDto {
-        id: row.get(0)?,
-        guid: row.get(1)?,
-        origin: row.get(2)?,
-        title: row.get(3)?,
-        description: row.get(4)?,
-        audio_url: row.get(5)?,
-        image_url: row.get(6)?,
-        // 发布时间为 0 = 源里没给，转成 None 让前端不显示
-        published_ms: match row.get::<_, i64>(7)? {
-            0 => None,
-            ms => Some(ms),
-        },
-        duration_sec: ms_to_sec(row.get(8)?),
-        podcast_title: row.get(9)?,
-        position_sec: position_ms.and_then(ms_to_sec),
-        finished: row.get::<_, i64>(11)? != 0,
-        skip_intro_sec: row.get(12)?,
-        skip_outro_sec: row.get(13)?,
-    })
+    row_to_dto(row, 0)
 }

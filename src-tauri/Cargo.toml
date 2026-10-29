@@ -21,7 +21,8 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 # tray-icon：M0 就要验证「最小化到托盘后音频不能断」
-tauri = { version = "2", features = ["tray-icon"] }
+# protocol-asset：M4 离线播放，把已下载的本地音频交给 WebView 播（asset:// 协议）
+tauri = { version = "2", features = ["tray-icon", "protocol-asset"] }
 
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -30,10 +31,12 @@ serde_json = "1"
 rusqlite = { version = "0.32", features = ["bundled"] }
 
 # rustls 而不是 openssl：Windows 上 openssl 是噩梦（任务书 §4）
-reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "gzip", "json"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "gzip", "json", "stream"] }
 # sync：刷新要用 Semaphore 把并发压到 3（任务书 §13）
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "sync"] }
 feed-rs = "2"
+# 下载要按块流式写盘，reqwest 的 bytes_stream 靠它驱动
+futures-util = "0.3"
 url = "2"
 
 thiserror = "2"

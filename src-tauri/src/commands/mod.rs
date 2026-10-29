@@ -2,9 +2,11 @@
 //! 所有命令统一返回 Result<T, String>，前端拿到的错误文本可直接展示。
 
 pub mod discover;
+pub mod download;
 pub mod episode;
 pub mod feed;
 pub mod legacy;
+pub mod library;
 pub mod opml;
 pub mod progress;
 pub mod queue;

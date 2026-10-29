@@ -1,6 +1,8 @@
 import { episodeGet } from "./api/episode";
+import { downloadPath, historyRecord } from "./api/library";
 import { progressGet, progressSave, sessionSave } from "./api/player";
 import { queueList, queueNext, queueRemoveEpisode } from "./api/queue";
+import { convertFileSrc } from "@tauri-apps/api/core";
 import type { Episode, QueueItem } from "./types";
 
 /** 倍速档位，0.5–3.0 之间，符合任务书 §10 */
@@ -65,6 +67,8 @@ class Player {
     on("play", () => {
       this.playing = true;
       this.#syncMediaSession();
+      // 每次真正开播记一笔历史；Rust 侧 60s 去重，pause/resume 不会刷屏
+      if (this.current) void historyRecord(this.current.id).catch(() => undefined);
     });
     on("pause", () => {
       this.playing = false;
@@ -168,6 +172,8 @@ class Player {
     await this.#flush();
 
     const startSec = await startPositionOf(episode);
+    // 已下载完成的优先走本地文件，离线也能听，也省流量（§13 下载闭环）
+    const src = await this.#resolveSrc(episode);
     this.current = episode;
     this.positionSec = startSec;
     this.durationSec = episode.durationSec ?? 0;
@@ -176,7 +182,7 @@ class Player {
     this.#lastFlushAt = Date.now();
     this.#skipOutroSec = episode.skipOutroSec ?? 0;
 
-    el.src = episode.audioUrl;
+    el.src = src;
     el.load();
     this.#armStartAt(startSec);
     this.#syncMediaSession();
@@ -197,10 +203,29 @@ class Player {
     this.positionSec = positionSec;
     this.durationSec = episode.durationSec ?? 0;
     this.#skipOutroSec = episode.skipOutroSec ?? 0;
-    el.src = episode.audioUrl;
+    el.src = episode.audioUrl; // 同步兜底，保证重启后立刻能点播
     el.load();
     this.#armStartAt(positionSec);
     this.#syncMediaSession();
+    // 若这集已下载，异步换成本地文件；用户还没点播时才替换，避免打断
+    void this.#preferLocal(el, episode, positionSec);
+  }
+
+  /** 已下载完成的返回 asset:// 本地地址，否则返回原始音频 URL */
+  async #resolveSrc(episode: Episode): Promise<string> {
+    const local = await downloadPath(episode.id).catch(() => null);
+    return local ? convertFileSrc(local) : episode.audioUrl;
+  }
+
+  /** 恢复播放态后把源换成本地文件；只在用户还没实际点播时替换，避免打断 */
+  async #preferLocal(el: HTMLAudioElement, episode: Episode, startSec: number): Promise<void> {
+    const local = await downloadPath(episode.id).catch(() => null);
+    if (!local) return;
+    if (this.current?.id !== episode.id) return; // 已经切到别的集
+    if (!el.paused || el.currentTime > 0.5) return; // 用户已开始播，别打断
+    el.src = convertFileSrc(local);
+    el.load();
+    this.#armStartAt(startSec);
   }
 
   seek(sec: number): void {
@@ -254,7 +279,10 @@ class Player {
       navigator.mediaSession.setActionHandler("pause", () => this.#el?.pause());
       navigator.mediaSession.setActionHandler("seekbackward", () => this.skip(-15));
       navigator.mediaSession.setActionHandler("seekforward", () => this.skip(30));
+      navigator.mediaSession.setActionHandler("previoustrack", () => this.skip(-30));
       navigator.mediaSession.setActionHandler("nexttrack", () => void this.#advance());
+      navigator.mediaSession.setActionHandler("stop", () => this.#el?.pause());
+      navigator.mediaSession.playbackState = this.playing ? "playing" : "paused";
     } catch {
       // 某些 WebView2 版本没有 MediaMetadata，忽略：媒体键是加分项不是主线
     }

@@ -151,6 +151,52 @@ pub struct OpmlImportReport {
     pub errors: Vec<String>,
 }
 
+/// 一条播放历史
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HistoryEntryDto {
+    pub id: i64,
+    pub played_at: i64,
+    pub episode: EpisodeDto,
+}
+
+/// 一条收藏
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FavoriteEntryDto {
+    pub added_at: i64,
+    pub episode: EpisodeDto,
+}
+
+/// 下载任务。`file_name` 只有文件名，完整路径由数据目录拼出来（§8.6）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DownloadTaskDto {
+    pub episode_id: String,
+    pub origin: String,
+    pub file_name: Option<String>,
+    pub received: i64,
+    pub total: i64,
+    /// pending | downloading | paused | done | failed
+    pub status: String,
+    pub error: Option<String>,
+    pub updated_at: i64,
+    pub title: String,
+    pub image_url: Option<String>,
+    pub duration_sec: Option<i64>,
+}
+
+/// 下载进度事件
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DownloadProgress {
+    pub episode_id: String,
+    pub received: i64,
+    pub total: i64,
+    /// 字节/秒
+    pub speed: i64,
+}
+
 /// dry-run 报告：让用户先看清会写进去什么，再决定要不要导。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

@@ -11,11 +11,15 @@
   interface Props {
     episodes: Episode[];
     currentId: string | null;
+    favorites: Set<string>;
     onPlay: (episode: Episode) => void;
     onQueue: (episode: Episode) => void;
+    onFavorite: (episode: Episode) => void;
+    onDownload: (episode: Episode) => void;
   }
 
-  let { episodes, currentId, onPlay, onQueue }: Props = $props();
+  let { episodes, currentId, favorites, onPlay, onQueue, onFavorite, onDownload }: Props =
+    $props();
 
   const ROW_HEIGHT = 84;
 
@@ -144,12 +148,33 @@
                 </div>
               </button>
 
-              <button
-                type="button"
-                onclick={() => onQueue(ep)}
-                class="mt-1 h-7 shrink-0 rounded-pill border border-line px-2 text-[11px] text-ink-sub hover:bg-canvas hover:text-ink"
-                title="加入播放队列">+队列</button
-              >
+              <div class="mt-0.5 flex shrink-0 items-center gap-1">
+                <button
+                  type="button"
+                  onclick={() => onFavorite(ep)}
+                  class="h-7 w-7 rounded-pill border border-line text-[11px] hover:bg-canvas {favorites.has(
+                    ep.id,
+                  )
+                    ? 'text-accent'
+                    : 'text-ink-weak hover:text-ink'}"
+                  title={favorites.has(ep.id) ? "取消收藏" : "收藏"}
+                  aria-pressed={favorites.has(ep.id)}
+                >
+                  {favorites.has(ep.id) ? "★" : "☆"}
+                </button>
+                <button
+                  type="button"
+                  onclick={() => onDownload(ep)}
+                  class="h-7 rounded-pill border border-line px-2 text-[11px] text-ink-weak hover:bg-canvas hover:text-ink"
+                  title="下载到本地">下载</button
+                >
+                <button
+                  type="button"
+                  onclick={() => onQueue(ep)}
+                  class="h-7 rounded-pill border border-line px-2 text-[11px] text-ink-sub hover:bg-canvas hover:text-ink"
+                  title="加入播放队列">+队列</button
+                >
+              </div>
             </div>
           </div>
         {/if}

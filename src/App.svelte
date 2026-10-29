@@ -3,6 +3,7 @@
   import EpisodeList from "./components/EpisodeList.svelte";
   import FeedBar from "./components/FeedBar.svelte";
   import ImportPanel from "./components/ImportPanel.svelte";
+  import LibraryPanel from "./components/LibraryPanel.svelte";
   import PlayerBar from "./components/PlayerBar.svelte";
   import PlayerPage from "./components/PlayerPage.svelte";
   import QueueDrawer from "./components/QueueDrawer.svelte";
@@ -12,6 +13,7 @@
   import { feedList, feedSubscribe, feedUnsubscribe, podcastUpdateSettings } from "./lib/api/feed";
   import { sessionLoad } from "./lib/api/player";
   import { queueAdd } from "./lib/api/queue";
+  import { downloadStart, favoriteAdd, favoriteIds, favoriteRemove } from "./lib/api/library";
   import { stripHtml } from "./lib/format";
   import { listen } from "@tauri-apps/api/event";
   import { player } from "./lib/player.svelte";
@@ -26,10 +28,11 @@
   let showPlayerPage = $state(false);
   let showQueue = $state(false);
   let showSettings = $state(false);
-  let view = $state<"subscriptions" | "discover">("subscriptions");
+  let view = $state<"subscriptions" | "discover" | "library">("subscriptions");
   let refreshing = $state(false);
   let refreshDone = $state(0);
   let refreshTotal = $state(0);
+  let favorites = $state<Set<string>>(new Set());
   let audioEl = $state<HTMLAudioElement | null>(null);
 
   // 频道设置表单（改名 / 跳过片头片尾）
@@ -79,6 +82,7 @@
       return [] as Podcast[];
     });
     podcasts = list;
+    await loadFavorites();
 
     if (podcasts[0]) await select(podcasts[0].origin);
     await player.refreshQueue();
@@ -144,6 +148,23 @@
     }
     await reload();
     if (!selected && podcasts[0]) await select(podcasts[0].origin);
+  }
+
+  async function loadFavorites(): Promise<void> {
+    favorites = new Set(await favoriteIds().catch(() => []));
+  }
+
+  async function toggleFavorite(episode: Episode): Promise<void> {
+    if (favorites.has(episode.id)) {
+      await favoriteRemove(episode.id).catch((e) => (error = describe(e)));
+    } else {
+      await favoriteAdd(episode.id).catch((e) => (error = describe(e)));
+    }
+    await loadFavorites();
+  }
+
+  async function startDownload(episode: Episode): Promise<void> {
+    await downloadStart(episode.id).catch((e) => (error = describe(e)));
   }
 
   async function enqueue(episode: Episode): Promise<void> {
@@ -214,7 +235,8 @@
       {selected}
       {view}
       {refreshing}
-      onView={(v) => (view = v === "discover" ? "discover" : "subscriptions")}
+      onView={(v) =>
+        (view = v === "discover" ? "discover" : v === "library" ? "library" : "subscriptions")}
       onSelect={select}
       onUnsubscribe={unsubscribe}
       onRefreshAll={() => void refreshAll()}
@@ -222,6 +244,8 @@
 
     {#if view === "discover"}
       <DiscoverPanel onSubscribed={() => void reload()} />
+    {:else if view === "library"}
+      <LibraryPanel />
     {:else}
     <main class="flex min-w-0 flex-1 flex-col">
       {#if current}
@@ -300,9 +324,12 @@
 
       <EpisodeList
         {episodes}
+        {favorites}
         currentId={player.current?.id ?? null}
         onPlay={(ep) => void player.toggle(ep)}
         onQueue={(ep) => void enqueue(ep)}
+        onFavorite={(ep) => void toggleFavorite(ep)}
+        onDownload={(ep) => void startDownload(ep)}
       />
     </main>
     {/if}

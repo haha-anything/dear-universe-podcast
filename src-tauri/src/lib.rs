@@ -23,9 +23,17 @@ use commands::{
         discover_search, discover_top, feed_keep_limit, feed_mark_all_played, feed_refresh,
         feed_refresh_all,
     },
+    download::{
+        download_cancel, download_list, download_path, download_pause, download_resume,
+        download_set_limit, download_start,
+    },
     episode::{episode_get, episode_list},
     feed::{feed_list, feed_subscribe, feed_unsubscribe, podcast_update_settings},
     legacy::{legacy_default_path, legacy_import, legacy_scan},
+    library::{
+        favorite_add, favorite_ids, favorite_list, favorite_remove, history_clear, history_list,
+        history_record, history_remove, progress_list_recent,
+    },
     opml::{opml_export, opml_import, opml_scan},
     progress::{progress_get, progress_save},
     queue::{
@@ -36,6 +44,7 @@ use commands::{
 };
 use core::{
     db::{self, Database},
+    download,
     http::HttpClient,
     sources::apple::AppleClient,
 };
@@ -57,6 +66,22 @@ pub fn run() {
             podcast_update_settings,
             discover_top,
             discover_search,
+            favorite_list,
+            favorite_add,
+            favorite_remove,
+            favorite_ids,
+            history_list,
+            history_record,
+            history_remove,
+            history_clear,
+            progress_list_recent,
+            download_list,
+            download_start,
+            download_pause,
+            download_resume,
+            download_cancel,
+            download_path,
+            download_set_limit,
             opml_scan,
             opml_import,
             opml_export,
@@ -85,6 +110,7 @@ pub fn run() {
             app.manage(db.clone());
             app.manage(db::Shared(db));
             app.manage(HttpClient::new()?);
+            app.manage(download::Downloader::new(&data_dir)?);
             // 目录服务起不来不能拖累启动：失败就退化成「发现页为空」
             match AppleClient::new() {
                 Ok(client) => {

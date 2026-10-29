@@ -100,6 +100,39 @@ export interface OpmlImportReport {
   errors: string[];
 }
 
+export interface HistoryEntry {
+  id: number;
+  playedAt: number;
+  episode: Episode;
+}
+
+export interface FavoriteEntry {
+  addedAt: number;
+  episode: Episode;
+}
+
+export interface DownloadTask {
+  episodeId: string;
+  origin: string;
+  fileName: string | null;
+  received: number;
+  total: number;
+  /** pending | downloading | paused | done | failed */
+  status: string;
+  error: string | null;
+  updatedAt: number;
+  title: string;
+  imageUrl: string | null;
+  durationSec: number | null;
+}
+
+export interface DownloadProgressEvent {
+  episodeId: string;
+  received: number;
+  total: number;
+  speed: number;
+}
+
 export interface LegacyCounts {
   podcasts: number;
   episodes: number;

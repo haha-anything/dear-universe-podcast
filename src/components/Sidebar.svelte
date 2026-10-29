@@ -27,6 +27,7 @@
   const TABS: ReadonlyArray<{ id: string; label: string }> = [
     { id: "subscriptions", label: "订阅" },
     { id: "discover", label: "发现" },
+    { id: "library", label: "资料库" },
   ];
 
   function displayName(podcast: Podcast): string {
